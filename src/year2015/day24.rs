@@ -43,5 +43,5 @@ fn arrangements(input: &[usize], groups: usize) -> usize {
         }
     }
 
-    qe[goal]    
+    qe[goal]
 }

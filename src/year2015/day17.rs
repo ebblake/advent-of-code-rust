@@ -8,34 +8,40 @@
 //! Tackling this with dynamic programming provides a much faster approach.
 use crate::util::parse::*;
 
-const GOAL: usize = 150;
-
 pub fn parse(input: &str) -> Vec<usize> {
     input.iter_unsigned().collect()
 }
 
 pub fn part1(input: &[usize]) -> u32 {
-    let mut ways = [0; GOAL + 1];
+    part1_testable(input, 150)
+}
+
+pub fn part2(input: &[usize]) -> u32 {
+    part2_testable(input, 150)
+}
+
+pub fn part1_testable(input: &[usize], goal: usize) -> u32 {
+    let mut ways = vec![0; goal + 1];
     ways[0] = 1;
 
     for &item in input {
-        for i in (item..GOAL + 1).rev() {
+        for i in (item..goal + 1).rev() {
             ways[i] += ways[i - item];
         }
     }
 
-    ways[GOAL]
+    ways[goal]
 }
 
-pub fn part2(input: &[usize]) -> u32 {
-    let mut ways = [0; GOAL + 1];
+pub fn part2_testable(input: &[usize], goal: usize) -> u32 {
+    let mut ways = vec![0; goal + 1];
     ways[0] = 1;
 
-    let mut minimum = [u32::MAX; GOAL + 1];
+    let mut minimum = vec![u32::MAX; goal + 1];
     minimum[0] = 0;
 
     for &item in input {
-        for i in (item..GOAL + 1).rev() {
+        for i in (item..goal + 1).rev() {
             let take = minimum[i - item].saturating_add(1);
             let not_take = minimum[i];
 
@@ -48,5 +54,5 @@ pub fn part2(input: &[usize]) -> u32 {
         }
     }
 
-    ways[GOAL]
+    ways[goal]
 }
