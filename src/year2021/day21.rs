@@ -64,40 +64,97 @@ pub fn part1(input: &State) -> usize {
 /// Each player can be in position 1 to 10 and can have a score from 0 to 20 (as a score of 21
 /// ends the game). This is a total of (10 × 21)² = 44,100 possible states. For speed this
 /// can fit in an array with perfect hashing, instead of using a slower `HashMap`.
+///
+/// In fact, the cache can be computed and utilized only at compile time; there are only 100 possible
+/// starting locations.
 pub fn part2(input: &State) -> usize {
-    let mut cache = vec![None; 44_100];
-    let (win, lose) = dirac(*input, &mut cache);
-    win.max(lose)
+    let ((player_position, _), (other_position, _)) = *input;
+    ANSWER_TABLE[player_position][other_position]
 }
 
-fn dirac(state: State, cache: &mut [Option<Pair>]) -> Pair {
-    let ((player_position, player_score), (other_position, other_score)) = state;
+const fn flat_index(
+    player_position: usize,
+    other_position: usize,
+    player_score: usize,
+    other_score: usize,
+) -> usize {
+    player_position + 10 * other_position + 100 * player_score + 2100 * other_score
+}
 
-    // Calculate the perfect hash of the state and lookup the cache in case we've seen this before.
-    let index = player_position + 10 * other_position + 100 * player_score + 2100 * other_score;
-    if let Some(result) = cache[index] {
-        return result;
+const fn compute_cache() -> [(usize, usize); 44_100] {
+    let mut cache = [(0, 0); 44_100];
+
+    // Iterate in reverse by total score, so that dependencies are available.
+    let mut total_score = 40;
+    loop {
+        let mut player_score = 0;
+        while player_score < 21 {
+            if total_score >= player_score && (total_score - player_score) < 21 {
+                let other_score = total_score - player_score;
+
+                let mut player_position = 0;
+                while player_position < 10 {
+                    let mut other_position = 0;
+                    while other_position < 10 {
+                        let mut player_wins = 0;
+                        let mut other_wins = 0;
+
+                        let mut i = 0;
+                        while i < DIRAC.len() {
+                            let (dice, frequency) = DIRAC[i];
+                            let next_position = (player_position + dice) % 10;
+                            let next_score = player_score + next_position + 1;
+
+                            if next_score >= 21 {
+                                player_wins += frequency;
+                            } else {
+                                let idx = flat_index(
+                                    other_position,
+                                    next_position,
+                                    other_score,
+                                    next_score,
+                                );
+                                let (next_other_wins, next_player_wins) = cache[idx];
+                                player_wins += next_player_wins * frequency;
+                                other_wins += next_other_wins * frequency;
+                            }
+                            i += 1;
+                        }
+
+                        let idx =
+                            flat_index(player_position, other_position, player_score, other_score);
+                        cache[idx] = (player_wins, other_wins);
+
+                        other_position += 1;
+                    }
+                    player_position += 1;
+                }
+            }
+            player_score += 1;
+        }
+        if total_score == 0 {
+            break;
+        }
+        total_score -= 1;
     }
 
-    let helper = |(win, lose), &(dice, frequency)| {
-        let advance = player_position + dice;
-        let next_position = if advance >= 10 { advance - 10 } else { advance };
-        let next_score = player_score + next_position + 1;
-
-        if next_score >= 21 {
-            (win + frequency, lose)
-        } else {
-            // Sneaky trick here to handle both players with the same function.
-            // We swap the order of player's state each turn, so that turns alternate
-            // and record the result as (lose, win) instead of (win, lose).
-            let next_state = ((other_position, other_score), (next_position, next_score));
-            let (next_lose, next_win) = dirac(next_state, cache);
-            (win + frequency * next_win, lose + frequency * next_lose)
-        }
-    };
-
-    // Compute the number of wins and losses from this position and add to the cache.
-    let result = DIRAC.iter().fold((0, 0), helper);
-    cache[index] = Some(result);
-    result
+    cache
 }
+
+const ANSWER_TABLE: [[usize; 10]; 10] = {
+    let cache = compute_cache();
+    let mut table = [[0; 10]; 10];
+
+    let mut player_position = 0;
+    while player_position < 10 {
+        let mut other_position = 0;
+        while other_position < 10 {
+            let (wins, losses) = cache[flat_index(player_position, other_position, 0, 0)];
+            table[player_position][other_position] = if wins > losses { wins } else { losses };
+            other_position += 1;
+        }
+        player_position += 1;
+    }
+
+    table
+};
